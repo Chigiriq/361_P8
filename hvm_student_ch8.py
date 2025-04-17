@@ -80,6 +80,20 @@ def getCall(function,nargs):
     46-58 in the Project 8 presentation available 
     on the nand2tetris.org website.
     """
+    #handling call
+    #we have to:
+    #   save caller's segment pointers
+    #   reposition ARG
+    #   reposition LCL
+    #   Go to execute the callee's code
+
+    #no helper function to set working stack of caller and nArgs
+
+    #---------bot stack----------
+    #working stack of caller
+    #nArgs
+    #saved frame
+
 
 def getFunction(function,nlocal):
     """
@@ -87,6 +101,18 @@ def getFunction(function,nlocal):
     and initializes local variables to zero.
     See slides 59-63 in the nand2tetris book.
     """
+    #We have to:
+    #   Inject an entry point label into the code
+    #   Initialize the local segment of the callee    
+    #
+    #---------bot stack----------
+    #working stack of caller
+    #nArgs
+    #saved frame
+    #nVars
+    #...
+    #SP
+    #global stack
 
 def getReturn():
     """
@@ -97,8 +123,22 @@ def getReturn():
     instruction pointer (IP) and reset the stack 
     pointer. See slides 64-76 of nand2tetris.org
     project 8.
-
     """
+
+    #overall idea
+# // The code below creates and uses two temporary variables:
+# // endFrame and retAddr;
+# // The pointer notation *addr is used to denote: RAM[addr].
+# endFrame = LCL            // gets the address at the frame’s end
+# retAddr = *(endFrame – 5) // gets the return address
+# *ARG = pop()              // puts the return value for the caller
+# SP = ARG + 1              // repositions SP
+# THAT = *(endFrame – 1)    // restores THAT
+# THIS = *(endFrame – 2)    // restores THIS
+# ARG = *(endFrame – 3)     // restores ARG
+# LCL = *(endFrame – 4)     // restores LCL\
+# goto retAddr              // jumps to the return address
+
 
 # More jank, this time to define the function pointers for flow control.
 PROG_FLOW  = {'if-goto':getIf_goto,'goto':getGoto,'label':getLabel,'call':getCall,'function':getFunction,'return':getReturn}
