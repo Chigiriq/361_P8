@@ -121,7 +121,7 @@ def getCall(function,nargs):
     #jump to function
     code += "@" + function + ", 0;JMP,"
 
-    code += "(" + returnLabel + ")"
+    code += getLabel(returnLabel)
     return code
 
 def _getMoveMem(src,dest):
@@ -183,9 +183,9 @@ def getReturn():
     # goto retAddr              // jumps to the return address
 
     #save endframe = LCL
-    code = "@LCL, D=M,@R13, M=D," #save to R13
+    code = "@LCL, D=M,@R14, M=D," #save to R14
     #get return address
-    code += "@R13, D=M, @5, A=D-A, D=M, @R14, M=D," #save to R14
+    code += "@R14, D=M, @5, A=D-A, D=M, @R15, M=D," #save to R15
 
     #pop return value
     code += _getPopMem("ARG")
@@ -193,17 +193,20 @@ def getReturn():
     #reposition SP
     code += "@ARG, D=M, @SP, M=D+1" #SP = ARG + 1
 
+    #wanna use _getPopMem()
     #restore THAT
-    code += "@R13, D=M, @1, A=D-A, D=M, @THAT, M=D," #THAT = *(endFrame - 1)
+    code += "@R14, D=M, @1, A=D-A, D=M, @THAT, M=D," #THAT = *(endFrame - 1)
     #restore THIS
-    code += "@R13, D=M, @2, A=D-A, D=M, @THIS, M=D," #THIS = *(endFrame - 2)
+    code += "@R14, D=M, @2, A=D-A, D=M, @THIS, M=D," #THIS = *(endFrame - 2)
     #restore ARG
-    code += "@R13, D=M, @3, A=D-A, D=M, @ARG, M=D," #ARG = *(endFrame - 3)
+    code += "@R14, D=M, @3, A=D-A, D=M, @ARG, M=D," #ARG = *(endFrame - 3)
     #restore LCL
-    code += "@R13, D=M, @4, A=D-A, D=M, @LCL, M=D," #LCL = *(endFrame - 4)
+    code += "@R14, D=M, @4, A=D-A, D=M, @LCL, M=D," #LCL = *(endFrame - 4)
 
     #goto retAddr
-    code += "@R14, A=M, 0;JMP," #goto retAddr
+    code += "@R15, A=M, 0;JMP," #goto retAddr
+
+    #have a return label so maybe use that???
     return code
 
 
