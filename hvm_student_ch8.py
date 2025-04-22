@@ -101,7 +101,8 @@ def getCall(function,nargs):
 
     #implementation
     #push the return address
-    code = _getPushLabel(uniqueLabel())
+    returnLabel = uniqueLabel()
+    code = _getPushLabel(returnLabel)
 
     #push the LCL pointer
     code += _getPushMem('LCL')
@@ -113,12 +114,22 @@ def getCall(function,nargs):
     code += _getPushMem('THAT')
 
     #reposition ARG
-    code += "@SP, D=M, @5, D=D-A," + str(nargs) +", D=D-A,"
+    code += "@SP, D=M, @5, D=D-A,@" + str(nargs) +", D=D-A, @ARG, M=D"
     #reposition LCL
-    code += "@SP, D=M, @LCL, D=D-A,"
-
+    code += _getMoveMem("SP", "LCL")
+    
     #jump to function
     code += "@" + function + ", 0;JMP,"
+
+    code += "(" + returnLabel + ")"
+    return code
+
+def _getMoveMem(src,dest):
+    """
+    Helper function to move the contents of src to memory location dest.
+    """
+    ans = "@" + str(src) + ",D=M," + "@" + str(dest) + ",M=D,"
+    return ans
 
 def getFunction(function,nlocal):
     """
@@ -144,8 +155,7 @@ def getFunction(function,nlocal):
     code = getLabel(function)
     #initialize local variables to zero
     for i in range(nlocal):
-        code += "@" + str(i) + ", D=0, @SP, A=M, M=D, @SP, M=M+1,"
-
+        code += "@0, D=0, @SP, A=M, M=D, @SP, M=M+1,"
     return code
 
 def getReturn():
@@ -208,7 +218,7 @@ def _getPushMem(src):
     """
     Helper function to push memory to location src to stack
     """
-    ans = "@" + str(src) + "," + getPushD()
+    ans = "@" + str(src) + ",D=M," + getPushD()
     return ans
 
 def _getPushLabel(src):
