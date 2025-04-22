@@ -299,6 +299,9 @@ def ParseFile(f):
                 outString += js
                 outString += getPushD()
 
+            elif args[0] in PROG_FLOW.keys():
+                outString 
+
             elif args[1] in SEGMENTS.keys():
                 outString += SEGMENTS[args[1]](args[0],args[1],args[2])
 
