@@ -52,27 +52,23 @@ def constantSeg(push,seg,index):
 SEGMENTS = {'constant':constantSeg,'static':constantSeg,'pointer':fixedSeg,'temp':fixedSeg,\
             'local':pointerSeg,'argument':pointerSeg,'this':pointerSeg,'that':pointerSeg}
 
-
 def getIf_goto(label):
     """
     Returns Hack ML to goto the label specified as
-    an input argument if the top entry of the stack is
+    an input arguement if the top entry of the stack is
     true.
     """
-    return getPopD() + '@%s, D;JNE,' % label
 
 def getGoto(label):
     """
     Return Hack ML string that will unconditionally 
-    jump to the input label.
+    jumpt to the input label.
     """
-    return '@%s, 0;JMP,' % label
 
 def getLabel(label):
     """
-    Returns Hack ML for a label, e.g., (label)
+    Returns Hack ML for a label, eg (label)
     """
-    return '(%s),' % label
 
 def getCall(function,nargs):
     """
@@ -97,28 +93,7 @@ def getCall(function,nargs):
     #working stack of caller
     #nArgs
     #saved frame
-    #nVars
 
-    #implementation
-    #push the return address
-    code = _getPushLabel(uniqueLabel())
-
-    #push the LCL pointer
-    code += _getPushMem('LCL')
-    #push the ARG pointer
-    code += _getPushMem('ARG')
-    #push the THIS pointer
-    code += _getPushMem('THIS')
-    #push the THAT pointer
-    code += _getPushMem('THAT')
-
-    #reposition ARG
-    code += "@SP, D=M, @5, D=D-A," + str(nargs) +", D=D-A,"
-    #reposition LCL
-    code += "@SP, D=M, @LCL, D=D-A,"
-
-    #jump to function
-    code += "@" + function + ", 0;JMP,"
 
 def getFunction(function,nlocal):
     """
@@ -139,15 +114,6 @@ def getFunction(function,nlocal):
     #SP
     #global stack
 
-    #implementation
-    #goto label
-    code = getLabel(function)
-    #initialize local variables to zero
-    for i in range(nlocal):
-        code += "@" + str(i) + ", D=0, @SP, A=M, M=D, @SP, M=M+1,"
-
-    return code
-
 def getReturn():
     """
     Returns Hack ML code to perform a return, one
@@ -158,47 +124,20 @@ def getReturn():
     pointer. See slides 64-76 of nand2tetris.org
     project 8.
     """
+
     #overall idea
-    # // The code below creates and uses two temporary variables:
-    # // endFrame and retAddr;
-    # // The pointer notation *addr is used to denote: RAM[addr].
-    # endFrame = LCL            // gets the address at the frame’s end
-    # retAddr = *(endFrame – 5) // gets the return address
-    # *ARG = pop()              // puts the return value for the caller
-    # SP = ARG + 1              // repositions SP
-    # THAT = *(endFrame – 1)    // restores THAT
-    # THIS = *(endFrame – 2)    // restores THIS
-    # ARG = *(endFrame – 3)     // restores ARG
-    # LCL = *(endFrame – 4)     // restores LCL\
-    # goto retAddr              // jumps to the return address
-
-    #save endframe = LCL
-    code = "@LCL, D=M,@R13, M=D," #save to R13
-    #get return address
-    code += "@R13, D=M, @5, A=D-A, D=M, @R14, M=D," #save to R14
-
-    #pop return value
-    code += _getPopMem("ARG")
-
-    #reposition SP
-    code += "@ARG, D=M, @SP, M=D+1" #SP = ARG + 1
-
-    #restore THAT
-    code += "@R13, D=M, @1, A=D-A, D=M, @THAT, M=D," #THAT = *(endFrame - 1)
-    #restore THIS
-    code += "@R13, D=M, @2, A=D-A, D=M, @THIS, M=D," #THIS = *(endFrame - 2)
-    #restore ARG
-    code += "@R13, D=M, @3, A=D-A, D=M, @ARG, M=D," #ARG = *(endFrame - 3)
-    #restore LCL
-    code += "@R13, D=M, @4, A=D-A, D=M, @LCL, M=D," #LCL = *(endFrame - 4)
-
-    #goto retAddr
-    code += "@R14, A=M, 0;JMP," #goto retAddr
-    return code
-
-
-
-    
+# // The code below creates and uses two temporary variables:
+# // endFrame and retAddr;
+# // The pointer notation *addr is used to denote: RAM[addr].
+# endFrame = LCL            // gets the address at the frame’s end
+# retAddr = *(endFrame – 5) // gets the return address
+# *ARG = pop()              // puts the return value for the caller
+# SP = ARG + 1              // repositions SP
+# THAT = *(endFrame – 1)    // restores THAT
+# THIS = *(endFrame – 2)    // restores THIS
+# ARG = *(endFrame – 3)     // restores ARG
+# LCL = *(endFrame – 4)     // restores LCL\
+# goto retAddr              // jumps to the return address
 
 
 # More jank, this time to define the function pointers for flow control.
