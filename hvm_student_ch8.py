@@ -194,7 +194,7 @@ def _getMoveMem(src,dest):
     ans = "@" + str(src) + ",D=M," + "@" + str(dest) + ",M=D,"
     return ans
 
-def getFunction(function,nlocal):
+def getFunction(function,nargs):
     """
     Return the Hack ML code to represent a function which sets a label
     and initializes local variables to zero.
@@ -215,10 +215,10 @@ def getFunction(function,nlocal):
 
     #implementation
     #goto label
-    output_string = f"// function {function} {nlocal},"
     output_string += f"({function}),"
 
-    for i in range(int(nlocal)):
+    #clear locals
+    for i in range(int(nargs)):
         output_string += ",".join([
             SEGMENTS["constant"]("push","constant",0),
         ])
@@ -252,7 +252,7 @@ def getReturn():
 
     #save endframe = LCL
     code = "// FRAME = LCL,@LCL, D=M,@R14, M=D," #save to R14
-    #get return address
+    #save return address
     code += "// RET = *(FRAME - 5),@5, A=D-A, D=M, @R15, M=D," #save to R15
 
     #pop return value
@@ -261,7 +261,6 @@ def getReturn():
     #reposition SP
     code += "// SP = ARG + 1,@ARG, D=M+1, @SP, M=D," #SP = ARG + 1
 
-    #wanna use _getPopMem()
     #restore THAT
     code += "// Restore THAT = FRAME - 1, @R14, AM=M-1, D=M, @THAT, M=D," #THAT = *(endFrame - 1)
     code += "// Restore THIS = FRAME - 2,@R14, AM=M-1, D=M, @THIS, M=D," #THIS = *(endFrame - 2)
@@ -271,7 +270,6 @@ def getReturn():
     #goto retAddr
     code += "// goto RET,@R15, A=M, 0;JMP," #goto retAddr
 
-    #have a return label so maybe use that???
     return code
 
 
@@ -415,7 +413,8 @@ def ParseFile(f):
 
 # source = sys.argv[1].strip()
 # Hardcoded path to the .vm file or directory
-source = "FunctionCalls\\SimpleFunction\\SimpleFunction.vm"
+# source = "FunctionCalls\\SimpleFunction\\SimpleFunction.vm"
+source = "361_P8\\ProgramFlow\\BasicLoop\\BasicLoop.vm"
 
 # no idea how to run the other tests so agonnnyyyyy. 
 # 1 AM MOMENT
