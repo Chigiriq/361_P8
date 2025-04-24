@@ -3,23 +3,84 @@ import os
 import sys
 import glob
 
-ARITH_BINARY = {'add':'A=A-1, M=M+D,','sub':'A=A-1, M=M-D,','and':'A=A-1, M=M&D,','or':'A=A-1, M=M|D,'}
+ARITH_BINARY = {'add':'A=A-1, M=D+M,','sub':'A=A-1, M=M-D,','and':'A=A-1, M=M&D,','or':'A=A-1, M=M|D,'}
 ARITH_UNARY = {'neg':'@SP, A=M-1, M=-M,','not':'@SP, A=M-1, M=!M,'}
 ARITH_TEST  = {'gt':'JGT','lt':'JLT','eq':'JEQ'}
 SEGLABEL = {'argument':'ARG','local':'LCL','this':'THIS','that':'THAT'}
 
 LABEL_NUMBER = 0
 
-def pointerSeg(push,seg,index):
-    # The following puts the segment's pointer + index in the D
-    # register
-    instr = '@%s, D=M, @%d, D=D+A,'%(SEGLABEL[seg],int(index))
-    if push == 'push':
-        return instr + ('A=D, D=M,'+getPushD())
-    elif push == 'pop':
-        return (instr+'@R15, M=D,' + getPopD() + '@R15, A=M, M=D,')
+# def pointerSeg(push,seg,index):
+#     # The following puts the segment's pointer + index in the D
+#     # register
+#     instr = '@%s, D=M, @%d, D=D+A,'%(SEGLABEL[seg],int(index))
+#     if push == 'push':
+#         return instr + ('A=D, D=M,'+getPushD())
+#     elif push == 'pop':
+#         return (instr+'@R15, M=D,' + getPopD() + '@R15, A=M, M=D,')
+#     else:
+#         print("Yikes, pointer segment, bet seg not found.")
+def pointerSeg(pushpop, seg, index):
+    """
+    Generate Hack assembly code for push/pop operations on pointer-based segments.
+
+
+    INPUTS:
+        pushpop = a text string 'pop' means pop to memory location, 'push' 
+                  is push memory location onto stack
+        seg     = the name of the segment that will be be the base address
+                  in the form of a text string
+        index   = an integer that specifies the offset from the base 
+                  address specified by seg
+
+    RETURN: 
+        The memory address is speficied by segment's pointer (SEGLABEL[seg]) + index (index))
+        if pushpop is 'push', push the address contents to the stack
+        if pushpop is 'pop' then pop the stack to the memory address.
+        The string returned accomplishes this. ML commands are seperated by commas (,).
+
+    NOTE: This function will only be called if the seg is one of:
+    "local", "argument", "this", "that"
+
+    """
+    output_str = ""
+    
+    base_address = SEGLABEL[seg]
+    if pushpop == "push":
+        # output_str = ",".join([
+        #     f"@{index}",
+        #     f"D=A",
+        #     f"@{base_address}",
+        #     "A=M",
+        #     f"A=D+A",
+        #     "D=M",
+        #     getPushD()
+        # ])
+        output_str = ",".join([
+            f"@{base_address}",
+            "D=M",
+            f"@{index}",
+            f"A=D+A",
+            "D=M",
+            getPushD()
+        ])
+
+
     else:
-        print("Yikes, pointer segment, bet seg not found.")
+        output_str = ",".join([
+            f"@{index}",
+            "D=A",
+            f"@{base_address}",
+            "D=D+M",
+            "@R13",
+            "M=D",
+            getPopD(),
+            "@R13",
+            "A=M",
+            "M=D",
+        ])
+
+    return output_str + ",,"
 
 def fixedSeg(push,seg,index):
     if push == 'push':
@@ -102,7 +163,8 @@ def getCall(function,nargs):
     #implementation
     #push the return address
     returnLabel = uniqueLabel()
-    code = _getPushLabel(returnLabel)
+    code = f"// call {function} {nargs},"
+    label_saved = _getPushLabel(returnLabel)
 
     #push the LCL pointer
     code += _getPushMem('LCL')
@@ -114,12 +176,13 @@ def getCall(function,nargs):
     code += _getPushMem('THAT')
 
     #reposition ARG
-    code += "@SP, D=M, @5, D=D-A,@" + str(nargs) +", D=D-A, @ARG, M=D"
+    code += "// ARG = SP - nArgs - 5,@SP, D=M, @" + str(int(nargs) + 5) + ", D=D-A, @ARG, M=D,"
     #reposition LCL
+    code += ",// LCL = SP,"
     code += _getMoveMem("SP", "LCL")
     
     #jump to function
-    code += "@" + function + ", 0;JMP,"
+    code += ",// goto Fn,@" + function + ", 0;JMP,(" + label_saved + ")// (return address),"
 
     code += getLabel(returnLabel)
     return code
@@ -152,11 +215,15 @@ def getFunction(function,nlocal):
 
     #implementation
     #goto label
-    code = getLabel(function)
-    #initialize local variables to zero
-    for i in range(nlocal):
-        code += "@0, D=0, @SP, A=M, M=D, @SP, M=M+1,"
-    return code
+    output_string = f"// function {function} {nlocal},"
+    output_string += f"({function}),"
+
+    for i in range(int(nlocal)):
+        output_string += ",".join([
+            SEGMENTS["constant"]("push","constant",0),
+        ])
+
+    return output_string
 
 def getReturn():
     """
@@ -181,30 +248,28 @@ def getReturn():
     # ARG = *(endFrame – 3)     // restores ARG
     # LCL = *(endFrame – 4)     // restores LCL\
     # goto retAddr              // jumps to the return address
+    code = "// return,"
 
     #save endframe = LCL
-    code = "@LCL, D=M,@R14, M=D," #save to R14
+    code = "// FRAME = LCL,@LCL, D=M,@R14, M=D," #save to R14
     #get return address
-    code += "@R14, D=M, @5, A=D-A, D=M, @R15, M=D," #save to R15
+    code += "// RET = *(FRAME - 5),@5, A=D-A, D=M, @R15, M=D," #save to R15
 
     #pop return value
-    code += _getPopMem("ARG")
+    code += "// *ARG = pop()," + _getPopMem("ARG")
 
     #reposition SP
-    code += "@ARG, D=M, @SP, M=D+1" #SP = ARG + 1
+    code += "// SP = ARG + 1,@ARG, D=M+1, @SP, M=D," #SP = ARG + 1
 
     #wanna use _getPopMem()
     #restore THAT
-    code += "@R14, D=M, @1, A=D-A, D=M, @THAT, M=D," #THAT = *(endFrame - 1)
-    #restore THIS
-    code += "@R14, D=M, @2, A=D-A, D=M, @THIS, M=D," #THIS = *(endFrame - 2)
-    #restore ARG
-    code += "@R14, D=M, @3, A=D-A, D=M, @ARG, M=D," #ARG = *(endFrame - 3)
-    #restore LCL
-    code += "@R14, D=M, @4, A=D-A, D=M, @LCL, M=D," #LCL = *(endFrame - 4)
+    code += "// Restore THAT = FRAME - 1, @R14, AM=M-1, D=M, @THAT, M=D," #THAT = *(endFrame - 1)
+    code += "// Restore THIS = FRAME - 2,@R14, AM=M-1, D=M, @THIS, M=D," #THIS = *(endFrame - 2)
+    code += "// Restore ARG = FRAME - 3,@R14, AM=M-1, D=M, @ARG, M=D," #ARG = *(endFrame - 3)
+    code += "// Restore LCL = FRAME - 4,@R14, AM=M-1, D=M, @LCL, M=D," #LCL = *(endFrame - 4)
 
     #goto retAddr
-    code += "@R15, A=M, 0;JMP," #goto retAddr
+    code += "// goto RET,@R15, A=M, 0;JMP," #goto retAddr
 
     #have a return label so maybe use that???
     return code
@@ -237,7 +302,7 @@ def _getPopMem(dest):
     """
     Helper function to pop the stack to the memory address dest.
     """
-    ans = getPopD() + "@" + str(dest) + ",M=D,"
+    ans = getPopD() + "@" + str(dest) + ",A=M,M=D,"
     return ans
 
 def _getMoveMem(src,dest):
@@ -267,16 +332,20 @@ def getPopD():
      return '@SP, AM=M-1, D=M,'
 
 def ParseFile(f):
-    outString = ""
+    # outString = ""
+    outString = f"// {sys.argv[0]},"
     for line in f:
         command = line2Command(line)
         if command:
             args = [x.strip() for x in command.split()] # Break command into list of arguments, no return characters
             if args[0] in ARITH_BINARY.keys():
                 outString += getPopD()
+                outString += f"// {args[0]},"
                 outString += ARITH_BINARY[args[0]]
 
+
             elif args[0] in ARITH_UNARY.keys():
+                outString += f"// {args[0]},"
                 outString += ARITH_UNARY[args[0]]
 
             elif args[0] in PROG_FLOW.keys():
@@ -286,6 +355,7 @@ def ParseFile(f):
                     outString += PROG_FLOW[args[0]]()
                 elif args[0] == 'label' or args[0] == 'goto' or args[0] == 'if-goto':
                     outString += PROG_FLOW[args[0]](args[1])
+
 
             elif args[0] in ARITH_TEST.keys():
                 outString += getPopD()
@@ -300,7 +370,19 @@ def ParseFile(f):
                 outString += getPushD()
 
             elif args[0] in PROG_FLOW.keys():
-                outString 
+                
+                if len(args) == 1:
+                    outString += PROG_FLOW[args[0]]()
+
+                elif len(args) == 2:
+                    cmd, label = args[0:2]
+                    outString += PROG_FLOW[cmd](label)
+
+                elif len(args) == 3:
+                    cmd, fn, n = args[0:3]
+                    outString += PROG_FLOW[cmd](fn, n)
+
+                out_string += ','
 
             elif args[1] in SEGMENTS.keys():
                 outString += SEGMENTS[args[1]](args[0],args[1],args[2])
@@ -312,7 +394,7 @@ def ParseFile(f):
 
     return outString
 
-def getInit(sysinit = True):
+# def getInit(sysinit = True):
     """
     Write the VM initialization code:
         Set the SP to 256.
@@ -331,13 +413,23 @@ def getInit(sysinit = True):
         os += '@%s, (%s), 0;JMP,' % (halt, halt)
     return os
 
-source = sys.argv[1].strip()
+# source = sys.argv[1].strip()
+# Hardcoded path to the .vm file or directory
+source = "FunctionCalls\\SimpleFunction\\SimpleFunction.vm"
+
+# no idea how to run the other tests so agonnnyyyyy. 
+# 1 AM MOMENT
+# I AM LOOSING BRAINCELLS
+# SEND HELP
+
+#notes:
+# functioncalls works
 
 out_string = ""
 
 if os.path.isdir(source):
     filelist = glob.glob(source+"*.vm")
-    out_string += getInit()
+    # out_string += getInit()
     for filename in filelist:
         f = open(filename)
         out_string += ParseFile(f)
@@ -345,8 +437,9 @@ if os.path.isdir(source):
 else:
     filename = source
     f = open(source)
-    out_string += getInit(sysinit=False)
+    # out_string += getInit(sysinit=False)
     out_string += ParseFile(f)
     f.close()
 
 print(out_string.replace(" ","").replace(',','\n'))
+
